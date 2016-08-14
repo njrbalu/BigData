@@ -1,0 +1,246 @@
+use balu;
+
+create table countries(
+name STRING,		
+landmass INT,	
+zone INT,	
+area INT,	
+population INT,	
+language INT,	
+religion INT,
+bars INT,
+stripes INT,	
+colours INT,
+red INT,
+green INT, 	
+blue INT,	
+gold INT,	
+white INT,	
+black INT,	
+orange INT,	
+mainhue STRING,
+circles INT,
+crosses INT,
+saltires INT,
+quarters INT,
+sunstars INT,
+crescent INT,
+triangle INT,
+icon INT,
+animate INT,	
+text INT,	
+topleft STRING,	
+botright STRING
+)
+row format delimited
+fields terminated by ','
+stored as textfile;
+--location '/user/njrbalu5070/countries.dat';
+
+LOAD DATA LOCAL INPATH '/home/njrbalu5070/Data/countries.dat' OVERWRITE INTO TABLE countries;
+
+
+
+--run the file using the command hive -f filename
+
+Copying file local to hdfs
+hadoop fs -copyFromLocal countries.dat countries.dat
+
+
+Count number of countries based on landmass
+--------------------------------------------
+select landmass,count(*) from countries group by landmass;
+
+PigScript for above
+--------------------
+file = load 'countries.dat' using PigStorage(',') as (name:chararray,landmass:INT,zone:int,area:int,population:int,language:int,religion:int,bars:int,stripes:int,colours:int,red:int,green:int,blue:int,gold:int,white:int,black:int,orange:int,mainhue:chararray,circles:int,crosses:int,saltires:int,quarters:int,sunstars:int,crescent:int,triangle:int,icon:int,animate:int,text:int,topleft:chararray,botright:chararray);
+landmass = group file by landmass;
+countofcountries= foreach landmass generate group, COUNT(file.name);
+
+
+
+Find out top 10 country with Sum of bars and strips in a flag
+---------------------------------------------------------------
+select name,bars+stripes as shapes from countries order by shapes desc limit 10;
+
+
+
+Count of countries with icon
+------------------------------
+select count(name) from countries where icon = 1;
+
+
+
+Count of countries which have same top left and bot right color in flag
+-------------------------------------------------------------------------
+select count(name) from countries where topleft=botright;
+
+
+
+Count number of countries based on zone
+----------------------------------------
+select zone,count(*) from countries group by zone;
+
+
+
+run the below script using pig syntax like pig filename
+
+Find out largest county in terms of area in NE zone(Pig Script)
+----------------------------------------------------------------
+file = load 'countries.dat' using PigStorage(',') as (name:chararray,landmass:INT,zone:int,area:int,population:int,language:int,religion:int,bars:int,stripes:int,colours:int,red:int,green:int,blue:int,gold:int,white:int,black:int,orange:int,mainhue:chararray,circles:int,crosses:int,saltires:int,quarters:int,sunstars:int,crescent:int,triangle:int,icon:int,animate:int,text:int,topleft:chararray,botright:chararray);
+countries = foreach file generate name,area,zone;
+countriesinNE = filter countries by zone == 1;
+orderedcountries = order countriesinNE by area desc;
+largestcountry = limit orderedcountries 1;
+name =  foreach largestcountry generate name;
+dump name;
+
+
+Find out least populated country in S.America landmass
+--------------------------------------------------------
+file = load 'countries.dat' using PigStorage(',') as (name:chararray,landmass:INT,zone:int,area:int,population:int,language:int,religion:int,bars:int,stripes:int,colours:int,red:int,green:int,blue:int,gold:int,white:int,black:int,orange:int,mainhue:chararray,circles:int,crosses:int,saltires:int,quarters:int,sunstars:int,crescent:int,triangle:int,icon:int,animate:int,text:int,topleft:chararray,botright:chararray);
+countries = foreach file generate name,landmass,population;
+countriesinSAlandmass = filter countries by landmass == 2;
+countriesinSAorderedbypopulation = order countriesinSAlandmass by population;
+leastpopulatedcountry = limit countriesinSAorderedbypopulation 1;
+name = foreach leastpopulatedcountry generate name;
+dump name;
+
+
+SA land mass has more than 1 country with population 0 so we group the data by population size and then order it by size and then display. but if the value is absolute above solution should work.
+----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
+file = load 'countries.dat' using PigStorage(',') as (name:chararray,landmass:INT,zone:int,area:int,population:int,language:int,religion:int,bars:int,stripes:int,colours:int,red:int,green:int,blue:int,gold:int,white:int,black:int,orange:int,mainhue:chararray,circles:int,crosses:int,saltires:int,quarters:int,sunstars:int,crescent:int,triangle:int,icon:int,animate:int,text:int,topleft:chararray,botright:chararray);
+countries = foreach file generate name,landmass,population;
+countriesinSAlandmass = filter countries by landmass == 2;
+countrieswithleastpopulation = group countriesinSAlandmass by population;
+orderedlist = order countrieswithleastpopulation by group;
+countries = limit orderedlist 1;
+names = foreach countries generate countriesinSAlandmass.name;
+
+
+Find out largest speaking language among all countries
+-------------------------------------------------------
+select language,count(*) as count from countries group by language order by count desc limit 1;
+
+
+
+
+Sum of all circles present in all country flags
+-------------------------------------------------
+select sum(circles) from countries;
+
+
+
+Count of countries which have both icon and text in flag
+------------------------------------------------------------
+select count(*) from countries where icon = 1 and text =1;
+
+
+
+Find most common colour among flags from all countries.
+---------------------------------------------------------
+
+
+package com.mapreduce;
+
+import java.io.IOException;
+
+import org.apache.hadoop.conf.Configuration;
+import org.apache.hadoop.fs.Path;
+import org.apache.hadoop.io.IntWritable;
+import org.apache.hadoop.io.Text;
+import org.apache.hadoop.mapred.JobClient;
+import org.apache.hadoop.mapred.lib.ChainReducer;
+import org.apache.hadoop.mapreduce.Job;
+import org.apache.hadoop.mapreduce.Mapper;
+import org.apache.hadoop.mapreduce.Reducer;
+import org.apache.hadoop.mapreduce.lib.input.FileInputFormat;
+import org.apache.hadoop.mapreduce.lib.output.FileOutputFormat;
+
+
+
+public class CommonColor {
+
+  public static class ColorMapper extends Mapper<Object, Text, Text, IntWritable>{
+    IntWritable one = new IntWritable(1);
+    String strOne = new String("1");
+    public void map(Object key, Text value, Context context) throws IOException, InterruptedException {
+    	String[] cols = (value.toString()).split("[,]");
+    	if(cols[10].equals(strOne))
+    		context.write(new Text("Red"), one);
+    		if(cols[11].equals(strOne))
+        		context.write(new Text("Green"), one);
+        	if(cols[12].equals(strOne))
+        		context.write(new Text("Blue"), one);
+        	if(cols[13].equals(strOne))
+        		context.write(new Text("Gold"), one);
+        	if(cols[14].equals(strOne))
+        		context.write(new Text("White"), one);
+        	if(cols[15].equals(strOne))
+        		context.write(new Text("Black"), one);
+        	if(cols[16].equals(strOne))
+        		context.write(new Text("Orange"), one);
+      }
+    }
+
+  public static class ColorReducer extends Reducer<Text,IntWritable,Text,Text> {
+   
+    public void reduce(Text key, Iterable<IntWritable> values,Context context) throws IOException, InterruptedException {  
+    	int sum = 0;
+      for (IntWritable val : values) {
+    	  sum=sum+1;
+      }	
+      context.write(null, new Text(key.toString()+"|"+sum));
+    }
+}
+  
+ public static class CommonColorMapper extends Mapper<Object, Text, Text, Text>{
+	    public void map(Object key, Text value, Context context) throws IOException, InterruptedException {
+	    		context.write(new Text("Color"),value);
+	    	}
+	    }
+
+public static class CommonColorReducer extends Reducer<Text,Text,Text,Text> {
+	   
+	    public void reduce(Text key, Iterable<Text> values,Context context) throws IOException, InterruptedException {  
+	      String commonColor=null;
+	      int commonColorUsage=0;
+	      for(Text val : values){
+	    	  String[] colorUsage = val.toString().split("[|]");
+	    	  if(commonColorUsage < Integer.parseInt(colorUsage[1])){
+	    		  commonColorUsage = Integer.parseInt(colorUsage[1]);
+	    		  commonColor = colorUsage[0];
+	    	  }  
+	      }
+	      context.write(null, new Text(commonColor));
+	    }
+	}
+
+    
+  public static void main(String[] args) throws Exception {
+    Configuration conf = new Configuration();
+    Job job = Job.getInstance(conf, "Group by color");
+    job.setJarByClass(CommonColor.class);
+    job.setMapperClass(ColorMapper.class);
+    job.setReducerClass(ColorReducer.class);
+    job.setOutputKeyClass(Text.class);
+    job.setOutputValueClass(IntWritable.class);
+    FileInputFormat.addInputPath(job, new Path(args[0]));
+    FileOutputFormat.setOutputPath(job, new Path(args[1]));
+    System.out.println("Running Job");
+    job.waitForCompletion(true);
+    
+    Configuration conf1 = new Configuration();
+    Job job1 = Job.getInstance(conf, "Common Color");
+    job1.setJarByClass(CommonColor.class);
+    job1.setMapperClass(CommonColorMapper.class);
+    job1.setReducerClass(CommonColorReducer.class);
+    job1.setOutputKeyClass(Text.class);
+    job1.setOutputValueClass(Text.class);
+    FileInputFormat.setInputDirRecursive(job1, true);
+    FileInputFormat.addInputPath(job1, new Path(args[1]));
+    FileOutputFormat.setOutputPath(job1, new Path(args[2]));
+    System.out.println("Running next Job");
+    job1.waitForCompletion(true);   
+  }
+}
